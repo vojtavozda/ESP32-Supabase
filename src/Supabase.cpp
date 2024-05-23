@@ -1,5 +1,7 @@
 #include "ESP32_Supabase.h"
 
+Supabase *globalSupabase = nullptr;
+
 // Define static variables here
 String Supabase::realtimeConfigJson;
 String Supabase::realtimeHeartbeatJson;
@@ -85,19 +87,63 @@ int Supabase::_login_process()
 
 Supabase::Supabase()
 {
+    initialized = false;
+    realtimeInitialized = false;
     realtimeStarted = false;
     realtimeTXTHandler = nullptr;
+    globalSupabase = this;
 }
 
 void Supabase::begin(String hostname_a, String key_a)
 {
-    client.setInsecure();
     hostname = hostname_a;
     key = key_a;
+    WiFi.onEvent(std::bind(&Supabase::onWiFiEvent, this, std::placeholders::_1, std::placeholders::_2));
+    initialized = true;
+
+    if (WiFi.status() == WL_CONNECTED) {
+        connect();
+    }
 }
 
-void Supabase::subscribeToRealtime(int port, String table, String id)
+void Supabase::onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info)
 {
+    switch (event)
+    {
+    case SYSTEM_EVENT_STA_GOT_IP:
+        connect();
+        break;
+    case SYSTEM_EVENT_STA_DISCONNECTED:
+        disconnect();
+        break;
+    default:
+        break;
+    }
+}
+
+void Supabase::connect() {
+    if (initialized) {
+        client.setInsecure();
+    }
+    if (realtimeInitialized) {
+        subscribeToRealtime();
+    }
+}
+
+void Supabase::disconnect() {
+    client.stop();
+
+    if (realtimeStarted) {
+        unsubscribeFromRealtime();
+    }
+}
+
+
+void Supabase::beginRealtime(int port, String table, String id)
+{
+    realtimePort = port;
+    realtimeTable = table;
+    realtimeId = id;
 
     realtimeConfigJson = 
     "{"
@@ -131,19 +177,43 @@ void Supabase::subscribeToRealtime(int port, String table, String id)
         "\"payload\": {},"
         "\"ref\": \"\""
     "}";
+
+    realtimeInitialized = true;
+
+    if (initialized && WiFi.status() == WL_CONNECTED) {
+        subscribeToRealtime();
+    }
     
+}
+
+void Supabase::subscribeToRealtime() {
+    if (!realtimeInitialized) {
+        Serial.println("Realtime not initialized! Call `beginRealtime` first");
+        return;
+    }
     String pureHostname = hostname;
-    if (pureHostname.startsWith("https://"))
-    {
+    if (pureHostname.startsWith("https://")) {
         // Remove "https://" string from the `hostname` (if exists)
         pureHostname = pureHostname.substring(8);
     }
     webSocket.beginSSL(
         pureHostname,
-        port,
+        realtimePort,
         "/realtime/v1/websocket?apikey=" + key + "&vsn=1.0.0");
     webSocket.onEvent(webSocketEvent);
     realtimeStarted = true;
+}
+
+void Supabase::unsubscribeFromRealtime()
+{
+    webSocket.disconnect();
+    realtimeStarted = false;
+    
+    if (heartbeat_timer != NULL) {
+        esp_timer_stop(heartbeat_timer);
+        esp_timer_delete(heartbeat_timer);
+        heartbeat_timer = NULL;
+    }
 }
 
 void Supabase::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)

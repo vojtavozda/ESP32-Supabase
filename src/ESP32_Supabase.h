@@ -15,6 +15,10 @@
 #error "This library is not supported for your board! ESP32 and ESP8266"
 #endif
 
+/** Need this for the trampoline */
+class Supabase;
+extern Supabase* globalSupabase;
+
 typedef void (*RealtimeTXTHandler)(uint8_t * payload, size_t length);
 typedef void (*WebSocketEventHandler)(WStype_t type, uint8_t * payload, size_t length);
 
@@ -42,7 +46,11 @@ private:
     unsigned int authTimeout = 0;
 
     // Websocktes
+    bool realtimeInitialized;
     bool realtimeStarted;
+    int realtimePort;
+    String realtimeTable;
+    String realtimeId;
     static String realtimeConfigJson;
     static String realtimeHeartbeatJson;
     static WebSocketsClient webSocket;
@@ -57,15 +65,38 @@ private:
     static void asyncUpdateTask(void *pvParameters);
     TaskHandle_t asyncUpdateTaskHandle;
 
+    /** This function is connected to WiFi events
+     * It ensures that client and realtime connections are stopped and
+     * re-established when WiFi is lost/reconnected
+    */
+    void onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info);
 
 public:
+
+    /** Supabase initialization status:
+     * `false` as default, `true` after `begin()`
+     * Use also to check if you want to call some supabase methods
+     * */
+    bool initialized;
+
     Supabase();
     ~Supabase() {};
 
+    /** Initialize supabase. Call this first. When WiFi is connected, it
+     * directly creates supabase client. Otherwise, it will wait for WiFi */
     void begin(String hostname_a, String key_a);
 
+    /** Start both supabase client and realtime (if initialized) */
+    void connect();
+    /** Stop both supabase client and realtime */
+    void disconnect();
+
     /** Init Supabase realtime. Port = 443 */
-    void subscribeToRealtime(int port, String table, String id);
+    void beginRealtime(int port, String table, String id);
+    /** Subscribe to realtime */
+    void subscribeToRealtime();
+    /** Unsubscribe (and stop the periodic heartbeat timer) */
+    void unsubscribeFromRealtime();
     /** Call this function periodically within loop() to listen to responses */
     void realtimeLoop();
 
