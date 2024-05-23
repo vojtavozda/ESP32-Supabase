@@ -26,6 +26,9 @@ class Supabase
 {
 
 private:
+
+    Stream* debugSerial;
+
     String hostname;
     String key;
     String USER_TOKEN;
@@ -71,6 +74,29 @@ private:
     */
     void onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info);
 
+    void debugPrint(const String& message) {
+        if (debugSerial) {
+            debugSerial->print(message);
+        }
+    }
+
+    void debugPrintln(const String& message) {
+        if (debugSerial) {
+            debugSerial->println(message);
+        }
+    }
+
+    void debugPrintf(const char* format, ...) {
+        if (debugSerial) {
+            va_list args;
+            va_start(args, format);
+            char buf[256]; // Buffer to hold the formatted string
+            vsnprintf(buf, sizeof(buf), format, args); // Format the string
+            debugSerial->print(buf); // Print the formatted string
+            va_end(args);
+        }
+    }
+
 public:
 
     /** Supabase initialization status:
@@ -83,8 +109,12 @@ public:
     ~Supabase() {};
 
     /** Initialize supabase. Call this first. When WiFi is connected, it
-     * directly creates supabase client. Otherwise, it will wait for WiFi */
-    void begin(String hostname_a, String key_a);
+     * directly creates supabase client. Otherwise, it will wait for WiFi
+     * @param hostname_a Supabase URL
+     * @param key_a Supabase anon key
+     * @param debugSerial_a Optional debug serial (`begin("h","k", &Serial);`)
+     * */
+    void begin(String hostname_a, String key_a, Stream* debugSerial_a = nullptr);
 
     /** Start both supabase client and realtime (if initialized) */
     void connect();

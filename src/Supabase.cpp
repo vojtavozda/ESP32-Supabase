@@ -12,17 +12,17 @@ RealtimeTXTHandler Supabase::realtimeTXTHandler;
 void hexdump(const void *mem, uint32_t len, uint8_t cols = 16)
 {
     const uint8_t *src = (const uint8_t *)mem;
-    Serial.printf("\n[HEXDUMP] Address: 0x%08X len: 0x%X (%d)", (ptrdiff_t)src, len, len);
+    // Serial.printf("\n[HEXDUMP] Address: 0x%08X len: 0x%X (%d)", (ptrdiff_t)src, len, len);
     for (uint32_t i = 0; i < len; i++)
     {
         if (i % cols == 0)
         {
-            Serial.printf("\n[0x%08X] 0x%08X: ", (ptrdiff_t)src, i);
+            // Serial.printf("\n[0x%08X] 0x%08X: ", (ptrdiff_t)src, i);
         }
-        Serial.printf("%02X ", *src);
+        // Serial.printf("%02X ", *src);
         src++;
     }
-    Serial.printf("\n");
+    // Serial.printf("\n");
 }
 
 void Supabase::_check_last_string()
@@ -38,7 +38,7 @@ int Supabase::_login_process()
 {
     int httpCode;
     JsonDocument doc;
-    Serial.println("Beginning to login..");
+    debugPrintln("Beginning to login..");
 
     if (https.begin(client, hostname + "/auth/v1/token?grant_type=password"))
     {
@@ -56,22 +56,22 @@ int Supabase::_login_process()
             {
                 USER_TOKEN = doc["access_token"].as<String>();
                 authTimeout = doc["expires_in"].as<int>() * 1000;
-                Serial.println("Login Success");
-                Serial.println(USER_TOKEN);
-                Serial.println(data);
+                debugPrintln("Login Success");
+                debugPrintln(USER_TOKEN);
+                debugPrintln(data);
             }
             else
             {
-                Serial.println("Login Failed: Invalid access token in response");
+                debugPrintln("Login Failed: Invalid access token in response");
             }
         }
         else
         {
-            Serial.println(phone_or_email);
-            Serial.println(password);
+            debugPrintln(phone_or_email);
+            debugPrintln(password);
 
-            Serial.print("Login Failed : ");
-            Serial.println(httpCode);
+            debugPrint("Login Failed : ");
+            // debugPrintln(httpCode);
         }
 
         https.end();
@@ -94,10 +94,11 @@ Supabase::Supabase()
     globalSupabase = this;
 }
 
-void Supabase::begin(String hostname_a, String key_a)
+void Supabase::begin(String hostname_a, String key_a, Stream* debugSerial_a)
 {
     hostname = hostname_a;
     key = key_a;
+    debugSerial = debugSerial_a;
     WiFi.onEvent(std::bind(&Supabase::onWiFiEvent, this, std::placeholders::_1, std::placeholders::_2));
     initialized = true;
 
@@ -188,7 +189,7 @@ void Supabase::beginRealtime(int port, String table, String id)
 
 void Supabase::subscribeToRealtime() {
     if (!realtimeInitialized) {
-        Serial.println("Realtime not initialized! Call `beginRealtime` first");
+        debugPrintln("Realtime not initialized! Call `beginRealtime` first");
         return;
     }
     String pureHostname = hostname;
@@ -222,7 +223,7 @@ void Supabase::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
     switch (type)
     {
     case WStype_DISCONNECTED:
-        // Serial.printf("[WSc] Disconnected!\n");
+        // debugPrintf("[WSc] Disconnected!\n");
         // Stop the timer
         if (heartbeat_timer != NULL)
         {
@@ -232,7 +233,7 @@ void Supabase::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
         }
         break;
     case WStype_CONNECTED:
-        // Serial.printf("[WSc] Connected to url: %s\n", payload);
+        // debugPrintf("[WSc] Connected to url: %s\n", payload);
         // Create periodic timer to send heartbeat message
         esp_timer_create_args_t timer_args;
         timer_args.callback = &heartbeat;
@@ -245,21 +246,21 @@ void Supabase::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
         webSocket.sendTXT(realtimeConfigJson);
         break;
     case WStype_TEXT:
-        // Serial.printf("[WSc] get text: %s\n", payload);
+        // debugPrintf("[WSc] get text: %s\n", payload);
         if (realtimeTXTHandler != nullptr)
         {
             realtimeTXTHandler(payload, length);
         }
         break;
     default:
-        // Serial.printf("[WSc] unknown type: %s\n", payload);
+        // debugPrintf("[WSc] unknown type: %s\n", payload);
         break;
     }
 }
 
 void Supabase::heartbeat(void *arg)
 {
-    Serial.println("[WS] Sending Heartbeat message");
+    // debugPrintln("[WS] Sending Heartbeat message");
     
     webSocket.sendTXT(realtimeHeartbeatJson);
 }
@@ -509,7 +510,7 @@ int Supabase::doUpdate(String json)
         }
         unsigned long t0 = millis();
         httpCode = https.PATCH(json);
-        // Serial.printf("PATCH took %d ms\n",millis()-t0);
+        // debugPrintf("PATCH took %d ms\n",millis()-t0);
         https.end();
     }
     else
@@ -606,7 +607,7 @@ void Supabase::asyncUpdateTask(void *pvParameters)
     //   }
     //   unsigned long t0 = millis();
     //   httpCode = https.PATCH(json);
-    //   Serial.printf("PATCH took %d ms\n",millis()-t0);
+    //   debugPrintf("PATCH took %d ms\n",millis()-t0);
     //   https.end();
     // }
     // urlQuery_reset();
