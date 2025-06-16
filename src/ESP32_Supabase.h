@@ -1,3 +1,7 @@
+/**
+ * Code adapted from: https://github.com/jhagas/ESPSupabase
+ */
+
 #ifndef ESP32_Supabase_h
 #define ESP32_Supabase_h
 
